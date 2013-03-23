@@ -1,0 +1,24 @@
+\name{kgrid}
+\alias{kgrid}
+\title{Return a vector of grid of penalties for cross-validation}
+\usage{
+  kgrid(gridmax, numpts)
+}
+\arguments{
+  \item{gridmax}{maximum value in penalty grid}
+
+  \item{numpts}{number of points in penalty grid}
+}
+\value{
+  vector of penalties between 1 and approximately
+  \code{gridmax} with logarithmic spacing
+}
+\description{
+  Return a vector of grid of penalties for cross-validation
+}
+\examples{
+gmax <- 20 ## maximum value for the grid of points
+npts <- 10 ## number of grid points returned
+gridpts <- kgrid(gmax,npts)
+}
+

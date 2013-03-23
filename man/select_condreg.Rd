@@ -1,0 +1,44 @@
+\name{select_condreg}
+\alias{select_condreg}
+\title{Compute the best condition number regularized based
+based on cross-validation selected penalty parameter}
+\usage{
+  select_condreg(X, k, ...)
+}
+\arguments{
+  \item{X}{n-by-p matrix of data}
+
+  \item{k}{vector of penalties for cross-validation}
+
+  \item{...}{parameters for \code{select_kmax}}
+}
+\value{
+  list of condition number regularized covariance matrix S
+  and its inverse invS
+}
+\description{
+  Compute the best condition number regularized based based
+  on cross-validation selected penalty parameter
+}
+\examples{
+## True covariance matrix
+\dontrun{sigma <- diag(5)}
+\dontrun{sigma[3,2] <- sigma[2,3] <- 0.8}
+
+## Generate normal random samples
+\dontrun{library(MASS)}
+\dontrun{X <- mvrnorm(200,rep(0,5),sigma)}
+
+## load pre-generated data
+data(condreg_data)
+
+## Covariance estimation
+gridpts <- kgrid(50,100)           ## generate grid of penalties to search over
+crcov <- select_condreg(X,gridpts) ## automatically selects penalty parameter
+
+## Inspect output
+str(crcov)              ## returned object
+sigma.hat <- crcov$S    ## estimate of sigma matrix
+omega.hat <- crcov$invS ## estimate of inverse of sigma matrix
+}
+

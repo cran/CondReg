@@ -1,0 +1,20 @@
+\name{crbulk}
+\alias{crbulk}
+\title{Computes multiple solutions}
+\usage{
+  crbulk(S, k)
+}
+\arguments{
+  \item{S}{sample covariance matrix}
+
+  \item{k}{vector of regularization parameters}
+}
+\value{
+  list of orthogonal matrix Q, shrinked eigenvalues Lbar
+  (shrinkage depending on penalty parameters) and sample
+  eigenvalues L
+}
+\description{
+  Computes multiple solutions
+}
+

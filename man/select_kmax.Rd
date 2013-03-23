@@ -1,0 +1,17 @@
+\name{select_kmax}
+\alias{select_kmax}
+\title{Selection of penalty parameter based on cross-validation}
+\usage{
+  select_kmax(X, k, fold = min(nrow(X), 10))
+}
+\arguments{
+  \item{X}{n-by-p data matrix}
+
+  \item{k}{vector of penalties for cross-validation}
+
+  \item{fold}{number of folds for cross-validation}
+}
+\description{
+  Selection of penalty parameter based on cross-validation
+}
+
