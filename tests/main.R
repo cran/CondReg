@@ -24,8 +24,8 @@ sigma.hat3.true <- matrix(sigma.hat3.true, ncol=ncol(X))
 omega.hat3.true <- matrix(omega.hat3.true, ncol=ncol(X))
 
 ## Compare computed vs known solutions
-if (!all(sigma.hat3.true==sigma.hat3)){ stop("Computed sigma.hat3 is wrong") }
-if (!all(omega.hat3.true==omega.hat3)){ stop("Computed omega.hat3 is wrong") }
+if (!all.equal(sigma.hat3.true,sigma.hat3)){ stop("Computed sigma.hat3 is wrong") }
+if (!all.equal(omega.hat3.true,omega.hat3)){ stop("Computed omega.hat3 is wrong") }
 
 
 #### kmax <- 5
@@ -51,5 +51,5 @@ sigma.hat5.true <- matrix(sigma.hat5.true, ncol=ncol(X))
 omega.hat5.true <- matrix(omega.hat5.true, ncol=ncol(X))
 
 ## Compare computed vs known solutions
-if (!all(sigma.hat5.true==sigma.hat5)){ stop("Computed sigma.hat5 is wrong") }
-if (!all(omega.hat5.true==omega.hat5)){ stop("Computed omega.hat5 is wrong") }
+if (!all.equal(sigma.hat5.true,sigma.hat5)){ stop("Computed sigma.hat5 is wrong") }
+if (!all.equal(omega.hat5.true,omega.hat5)){ stop("Computed omega.hat5 is wrong") }

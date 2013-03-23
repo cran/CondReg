@@ -1,4 +1,4 @@
-9d551f12227ad0a3991d7acf8c0b4ffa *DESCRIPTION
+7671f147482a73095a7348b1a6b8705a *DESCRIPTION
 27104c67a03dc48880a0b75cbaa6e6cb *NAMESPACE
 d4918d95f389877b3bb709cef3e3e2ba *R/condreg.R
 017f70627bdbe4789216ca5b72d06c17 *data/condreg_data.rda
@@ -12,4 +12,4 @@ c05bf3dabc6178994aadde1b2c6c17d5 *man/ml_solver.Rd
 fa0bbce92bb6eb83ffda7841f22346aa *man/select_condreg.Rd
 cc9844194226d9591bf8fbf7cb1ca6e4 *man/select_kmax.Rd
 7033e0f3df53d89b6b6c4f320c5ba49c *man/sigma.Rd
-277ee9c37f4c5fa3df0a854f501d6d77 *tests/main.R
+4db4388cab3854bc51c15ea49deab7ca *tests/main.R
