@@ -1,14 +1,36 @@
-#' @name X
-#' @title Sample data matrix X for CondReg examples
-#' @description n-by-p (200-by-5) matrix of multivariate normal data
+#' Standard & Poors index
+#' @name datasnp
 #' @docType data
 NULL
 
-#' @name sigma
-#' @title True covariance matrix of X
-#' @description p-by-p (5-by-5) covariance matrix
+#' Weekly stock price data
+#' @name R
 #' @docType data
 NULL
+
+#' Compute optimal portfolio weights
+#' @param sigma covariance matrix
+#' @return new portfolio weights
+#' @export
+pfweights <- function(sigma){
+  p <- ncol(sigma)
+  w <- solve(sigma, rep(1,p))
+  w/sum(w)
+}
+
+#' Compute transaction cost
+#' @param wnew new portfolio weights
+#' @param wold old portfolio weights
+#' @param lastearnings earnings from last period
+#' @param reltc relative transaction cost
+#' @param wealth current wealth
+#' @return transaction cost of rebalancing portfolio
+#' @export
+transcost <- function(wnew, wold, lastearnings, reltc, wealth){
+  wold <- lastearnings * wold
+  if (sum(wold)!=0) wold <- wold/sum(wold)
+  wealth * reltc * sum(abs(wnew-wold))
+}
 
 #' Return a vector of grid of penalties for cross-validation
 #' @param gridmax maximum value in penalty grid
@@ -20,10 +42,13 @@ NULL
 #' npts <- 10 ## number of grid points returned
 #' gridpts <- kgrid(gmax,npts)
 #' @export
-kgrid <- function( gridmax, numpts ){
-  gridmax <- round(exp(gridmax-1))
-  x <- seq(1, gridmax, length.out=numpts)
-  log(1/x) + log(max(x)) + 1
+kgrid <- function(gridmax, numpts){
+    x <- seq(1, gridmax, length.out = numpts)
+    y <- 1/x
+    y <- y - min(y)
+    y <- y / max(y)
+    y <- (y * (gridmax-1)) + 1
+    y
 }
 
 #' Compute the best condition number regularized based 
@@ -35,15 +60,13 @@ kgrid <- function( gridmax, numpts ){
 #' and its inverse invS
 #' @examples
 #' ## True covariance matrix
-#' \dontrun{sigma <- diag(5)}
-#' \dontrun{sigma[3,2] <- sigma[2,3] <- 0.8}
+#' sigma <- diag(5)
+#' sigma[3,2] <- sigma[2,3] <- 0.8
 #'
 #' ## Generate normal random samples
-#' \dontrun{library(MASS)}
-#' \dontrun{X <- mvrnorm(200,rep(0,5),sigma)}
-#'
-#' ## load pre-generated data
-#' data(condreg_data)
+#' \dontrun{
+#' library(MASS)
+#' X <- mvrnorm(200,rep(0,5),sigma)
 #'
 #' ## Covariance estimation
 #' gridpts <- kgrid(50,100)           ## generate grid of penalties to search over
@@ -53,6 +76,7 @@ kgrid <- function( gridmax, numpts ){
 #' str(crcov)              ## returned object
 #' sigma.hat <- crcov$S    ## estimate of sigma matrix
 #' omega.hat <- crcov$invS ## estimate of inverse of sigma matrix
+#' }
 #' @export
 select_condreg <- function(X, k, ...){
 
@@ -73,9 +97,10 @@ select_condreg <- function(X, k, ...){
 #' Compute shrinkage of eigenvalues for condreg
 #' @param L vector of eigenvalues
 #' @param k vector of penalties
+#' @param dir direction of path solver ('forward' or 'backward')
 #' @return list of vector of shrinked eigenvalues \code{Lbar},
 #'   optimal u value \code{uopt} and interval indicator \code{intv}.
-ml_solver <- function(L, k){
+ml_solver <- function(L, k, dir='forward'){
 
   p <- length(L)
   g <- length(k)
@@ -95,7 +120,14 @@ ml_solver <- function(L, k){
 
   if ( any(!degenindx) ){
     kmax1 <- k[!degenindx]
-    path <- path_solver(L)
+
+    if (dir=='forward'){
+        path <- path_forward(L)
+    } else if (dir=='backward'){
+        path <- path_backward(L)
+    } else {
+        stop("dir is either 'forward' or 'backward'\n")
+    }
 
     tmp <- approx(path$k,1/path$u,kmax1)
     uopt <- 1/tmp$y
@@ -125,76 +157,168 @@ ml_solver <- function(L, k){
 }
 
 #' Compute optimal u of Lemma 1 in JRSSB paper
+#' using the forward algorithm
 #' @param L vector of eigenvalues
-path_solver <- function(L) {
+path_forward <- function(L) {
+    
+    p <- length(L)
+    
+    idxzero <- L<.Machine$double.eps
+    numzero <- sum(idxzero)
+    L[idxzero] <- .Machine$double.eps
+    
+    u_cur <- 1/mean(L)
+    v_cur <- u_cur
+    
+    alpha <- 0
+    while ( u_cur > 1/L[alpha+1] ) {
+        alpha <- alpha + 1
+    }
+    beta <- alpha + 1
+    slope_num <- sum(L[1:alpha])
+    slope_denom <- sum(L[beta:p])
+    
+    u <- u_cur
+    v <- v_cur
+    kmax <- 1
+    
+    r <- p - numzero
+    isDone <- FALSE
+    
+    while ( alpha >=1 && beta <= r){
+        # intersection of the line passing (u_cur,v_cur) of slope 'slope' with 
+        # the rectangle [ 1/d(alpha), 1/d(alpha+1) ] x [ 1/d(beta-1), 1/d(beta) ]
+        h_top <- 1/L[beta]
+        v_left <- 1/L[alpha]
+        
+        # First, compute intersection with the horizontal line v=1/d(beta)
+        v_new <- h_top
+        u_new <- u_cur - slope_denom*(v_new - v_cur)/slope_num
 
-  p <- length(L)
-
-  idxzero <- L<.Machine$double.eps
-  numzero <- sum(idxzero)
-  L[idxzero] <- .Machine$double.eps
-
-  beta <- p
-
-  slope_denom <- sum(L[beta:p])
-
-  u_cur <- 1/L[1]
-  v_cur <- 1/L[beta]
-
-  alpha <- 1
-  slope_num <- sum(L[1:alpha])
-
-  u <- u_cur
-  v <- v_cur
-  kmax <- v_cur/u_cur
-
-  isDone <- FALSE
-
-  while (!isDone){
-
-    h_bottom <- 1/L[beta-1]
-    v_right <- 1/L[alpha+1]
-
-    u_new <- (slope_num*u_cur + slope_denom*v_cur)/(slope_num+slope_denom)
-    v_new <- u_new
-    if (u_new < v_right & v_new > h_bottom) {
-      isDone <- TRUE
-    } else {
-      v_new <- h_bottom;
-      u_new <- u_cur - slope_denom*(v_new - v_cur)/slope_num;
-      if ( u_new < v_right ){	## u_new inside the grid
-        beta <- beta - 1;
-        slope_denom <- slope_denom + L[beta];
-      } else { ## u_new outside the grid. compute for the vertical line u=1/L(alpha+1).
-        u_new <- v_right;
-        v_new <- v_cur - slope_num*(u_new - u_cur)/slope_denom;
-        if ( v_new > h_bottom ) { ## v_new inside the grid
-          alpha <- alpha + 1;
-          slope_num <- slope_num + L[alpha];
-        } else { ## intersection at the bottom right corner of the grid
-          u_new <- v_right;
-          v_new <- h_bottom;
-          alpha <- alpha + 1;
-          beta <- beta - 1;
-          slope_num <- slope_num + L[alpha];
-          slope_denom <- slope_denom + L[beta];
+        # If u_new is outside the rectangle, 
+        # compute intersection with the vertical line u=1/d(alpha+1).
+        if ( u_new < v_left ) {
+            u_new <- v_left
+            v_new <- v_cur - slope_num*(u_new - u_cur)/slope_denom
         }
-      }
-    }
-    new_kmax <- v_new/u_new
+        
+        # update
+        if ( abs(u_new - v_left) < .Machine$double.eps ) {
+            # keep this order!
+            slope_num <- slope_num - L[alpha]   # first
+            alpha <- alpha - 1                  # second
+        }
+        if ( abs(v_new - h_top) < .Machine$double.eps ) {
+            # keep this order!
+            slope_denom <- slope_denom - L[beta]  # first
+            beta <- beta + 1                      # second
+        }
+        
+        new_kmax <- v_new/u_new
+        u <- c(u, u_new)
+        v <- c(v, v_new)
+        kmax <- c(kmax, new_kmax )
 
-    if ( any(abs(new_kmax - kmax) > .Machine$double.eps) ) {
-      u = c(u_new, u);
-      v = c(v_new, v);
-      kmax = c(new_kmax, kmax);
+        u_cur <- u_new;
+        v_cur <- v_new;
     }
-    u_cur = u_new;
-    v_cur = v_new;
-  }
-
-  list(k=kmax, u=u, v=v)
-  
+    
+    # vertical half-infite line segment
+    kmax <- c(kmax, Inf)
+    u <- c(u, u_new)
+    v <- c(v, Inf)
+    
+    # return value
+    list(k=kmax, u=u, v=v)
 }
+
+#' Compute optimal u of Lemma 1 in JRSSB paper
+#' using the backward algorithm
+#' @param L vector of eigenvalues
+path_backward <- function(L) {
+    
+    p <- length(L)
+    
+    idxzero <- L<.Machine$double.eps
+    numzero <- sum(idxzero)
+    L[idxzero] <- .Machine$double.eps
+    
+    r <- p - numzero   # rank
+    
+    # ending point finding algorithm
+    alpha <- 1
+    slope_num <- sum(L[1:alpha])
+    u_cur <- (alpha+p-r)/slope_num
+    while ( u_cur < 1/L[alpha] || u_cur > 1/L[alpha+1] ) {
+        alpha <- alpha + 1
+        slope_num <- slope_num + L[alpha]
+        u_cur <- (alpha+p-r)/slope_num
+    }
+    
+    v_cur = 1/L[r]
+    
+    beta <- r
+    slope_denom <- sum(L[beta:p])
+    
+    # vertical half-infinite line segment
+    u <- c(u_cur, u_cur)
+    v <- c(v_cur, Inf)
+    kmax <- c(v_cur/u_cur, Inf)
+    
+    isDone <- FALSE
+    while (!isDone){
+        # intersection of the line passing (u_cur,v_cur) of slope 'slope' with 
+        # the rectangle [ 1/d(alpha), 1/d(alpha+1) ] x [ 1/d(beta-1), 1/d(beta) ]
+        h_bottom <- 1/L[beta-1]
+        v_right <- 1/L[alpha+1]
+        
+        # First, check the intersection with the diagonal line v=u.
+        u_new <- (slope_num*u_cur + slope_denom*v_cur)/(slope_num+slope_denom)
+        v_new <- u_new
+        if (u_new < v_right && v_new > h_bottom) {
+            isDone <- TRUE
+            u <- c(u_new, u)
+            v <- c(v_new, v)
+            kmax <- c(1, kmax)
+            break
+        }
+        
+        # Compute intersection with the horizontal line v=1/d(beta-1)
+        v_new <- h_bottom
+        u_new <- u_cur - slope_denom*(v_new - v_cur)/slope_num
+        
+        # If u_new is outside the rectangle, 
+        # compute intersection with the vertical line u=1/d(alpha+1).
+        if ( u_new > v_right ){
+            u_new <- v_right;
+            v_new <- v_cur - slope_num*(u_new - u_cur)/slope_denom
+        }
+        
+        # update
+        if ( abs(u_new - v_right) < .Machine$double.eps ) {
+            # keep this order!
+            alpha <- alpha + 1                   # first
+            slope_num <- slope_num + L[alpha]    # second
+        }
+        if ( abs(v_new - h_bottom) < .Machine$double.eps ) {
+            # keep this order!
+            beta <- beta - 1                      # first
+            slope_denom <- slope_denom + L[beta]  # second
+        }
+        
+        new_kmax <- v_new/u_new
+
+        u <- c(u_new, u)
+        v <- c(v_new, v)
+        kmax = c(new_kmax, kmax)
+
+        u_cur = u_new;
+        v_cur = v_new;
+    }
+    # return value
+    list(k=kmax, u=u, v=v)
+}
+
 
 #' Selection of penalty parameter based on cross-validation
 #' @param X n-by-p data matrix
@@ -249,25 +373,19 @@ select_kmax <- function(X, k, fold=min(nrow(X),10)){
 }
 
 #' Compute the condition number with given penalty parameter
-#' @param data_in data in one of two formats. 1) If a list, elements
-#' should be an orthogonal matrix Q and a vector of eigenvalues L from
-#' the spectral decomposition of sample covariance matrix of the
-#' data. 2) If a n-by-p matrix, each of the n rows are the p variate
-#' random observations.
+#' @param data_in input data
 #' @param kmax scalar regularization parameter
 #' @return list of condition number regularized covariance matrix s
 #' and its inverse invS. 
 #' @examples
 #' ## True covariance matrix
-#' \dontrun{sigma <- diag(5)}
-#' \dontrun{sigma[3,2] <- sigma[2,3] <- 0.8}
+#' sigma <- diag(5)
+#' sigma[3,2] <- sigma[2,3] <- 0.8
 #'
 #' ## Generate normal random samples
-#' \dontrun{library(MASS)}
-#' \dontrun{X <- mvrnorm(200,rep(0,5),sigma)}
-#'
-#' ## load pre-generated data
-#' data(condreg_data)
+#' \dontrun{
+#' library(MASS)
+#' X <- mvrnorm(200,rep(0,5),sigma)
 #'
 #' ## Covariance estimation
 #' crcov <- condreg(X,3)
@@ -276,6 +394,7 @@ select_kmax <- function(X, k, fold=min(nrow(X),10)){
 #' str(crcov)              ## returned object
 #' sigma.hat <- crcov$S    ## estimate of sigma matrix
 #' omega.hat <- crcov$invS ## estimate of inverse of sigma matrix
+#' }
 #' @export
 condreg <- function(data_in, kmax){
   
